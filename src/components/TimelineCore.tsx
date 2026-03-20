@@ -1,448 +1,476 @@
-import React, { useEffect, useRef, useState } from 'react';
-import * as d3 from 'd3';
-import { timelineData } from '../data/timelineData';
+import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
+import {
+  Circle, FileText, Compass, Award,
+  User, X, AlignLeft, AlertTriangle, Check
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import type { Student } from '../data/studentsData';
+import type { TimelineEvent } from '../services/dataverse';
+import { deriveStudentEvents } from '../services/dataverse';
+import type { SurveyField } from '../services/surveyFields';
 
 interface TimelineCoreProps {
+  student: Student | null;
+  events?: TimelineEvent[];
   onSelectEvent: (event: any) => void;
 }
 
-export function TimelineCore({ onSelectEvent }: TimelineCoreProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+// Stage 1 covers both stageProgress 1 (referral) and 2 (consent).
+// Stage 2 = stageProgress 3 (career_guidance).
+// Stage 3 = stageProgress 4 (complete).
+const STAGES = [
+  { id: 'step-1', number: 1, label: 'Referral & Consent', icon: FileText,  color: 'primary', eventIds: ['step-1', 'step-2'] },
+  { id: 'step-3', number: 2, label: 'Career Guidance',    icon: Compass,   color: 'primary', eventIds: ['step-3']           },
+  { id: 'step-4', number: 3, label: 'Complete',           icon: Award,     color: 'primary', eventIds: ['step-4']           },
+];
 
-  useEffect(() => {
-    const observeTarget = containerRef.current;
-    if (!observeTarget) return;
+const typeBadgeColor: Record<string, string> = {
+  referral: 'bg-primary/10 text-primary border-primary/20',
+  consent:  'bg-emerald-50 text-emerald-700 border-emerald-200',
+  session:  'bg-primary/10 text-primary border-primary/20',
+  survey:   'bg-emerald-50 text-emerald-700 border-emerald-200',
+};
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      if (entries[0]) {
-        const { width, height } = entries[0].contentRect;
-        setDimensions({ width, height });
-      }
-    });
+const typeIconBg = 'bg-slate-100 text-slate-500';
 
-    resizeObserver.observe(observeTarget);
-    return () => resizeObserver.unobserve(observeTarget);
-  }, []);
+export function TimelineCore({ student, events: propEvents, onSelectEvent }: TimelineCoreProps) {
+  const [activeStage, setActiveStage] = useState<string | null>(null);
+  const [modalEvent, setModalEvent]   = useState<any | null>(null);
 
-  useEffect(() => {
-    if (dimensions.width === 0 || dimensions.height === 0) return;
+  const events    = propEvents ?? (student ? deriveStudentEvents(student) : []);
+  const eventById = Object.fromEntries(events.map(e => [e.id, e]));
 
-    const { width, height } = dimensions;
-    const margin = { top: 80, right: 40, bottom: 60, left: 60 };
-    const innerWidth = width - margin.left - margin.right;
-    const innerHeight = height - margin.top - margin.bottom;
-    const axisY = innerHeight / 2; // Center axis
+  const stageToIndex: Record<string, number> = {
+    referral:        0,
+    consent:         0,
+    career_guidance: 1,
+    complete:        2,
+  };
+  const currentStageIndex = student?.currentStage
+    ? (stageToIndex[student.currentStage] ?? -1)
+    : -1;
 
-    // Clear previous SVG
-    d3.select(containerRef.current).selectAll('svg').remove();
-    d3.select(containerRef.current).selectAll('.tooltip').remove();
+  const stage1Complete = (student?.stageProgress ?? 0) >= 2;
 
-    const svg = d3.select(containerRef.current)
-      .append('svg')
-      .attr('width', width)
-      .attr('height', height)
-      .attr('class', 'absolute top-0 left-0');
-
-    // Define clip path
-    svg.append('defs').append('clipPath')
-      .attr('id', 'clip')
-      .append('rect')
-      .attr('width', innerWidth)
-      .attr('height', innerHeight)
-      .attr('x', 0)
-      .attr('y', 0);
-
-    const mainGroup = svg.append('g')
-      .attr('transform', `translate(${margin.left},${margin.top})`);
-
-    // Parse dates
-    const parseDate = (d: string) => parseISO(d);
-    const allDates = [
-      ...timelineData.academic.map(d => parseDate(d.date)),
-      ...timelineData.attendance.map(d => parseDate(d.date)),
-      ...timelineData.events.map(d => parseDate(d.date)),
-      ...timelineData.riskPeriods.map(d => parseDate(d.start)),
-      ...timelineData.riskPeriods.map(d => parseDate(d.end))
-    ].filter(Boolean) as Date[];
-
-    const minDate = d3.min(allDates) || new Date(2025, 0, 1);
-    const maxDate = d3.max(allDates) || new Date(2026, 2, 17);
-
-    // Add padding to dates
-    const paddedMin = new Date(minDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const paddedMax = new Date(maxDate.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-    // Scales
-    const xScale = d3.scaleTime()
-      .domain([paddedMin, paddedMax])
-      .range([0, innerWidth]);
-
-    const yScaleAcademic = d3.scaleLinear()
-      .domain([50, 100])
-      .range([axisY - 20, 0]);
-
-    const yScaleAttendance = d3.scaleLinear()
-      .domain([60, 100])
-      .range([axisY + 20, innerHeight]);
-
-    // Zoom behavior
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([1, 10])
-      .translateExtent([[0, 0], [innerWidth, innerHeight]])
-      .extent([[0, 0], [innerWidth, innerHeight]])
-      .on('zoom', (event) => {
-        const newXScale = event.transform.rescaleX(xScale);
-        updateTimeline(newXScale);
-      });
-
-    svg.call(zoom);
-
-    // --- Risk Background ---
-    const riskGroup = mainGroup.append('g').attr('class', 'risk-background').attr('clip-path', 'url(#clip)');
-    
-    // --- Axes ---
-    const xAxisGroup = mainGroup.append('g')
-      .attr('class', 'x-axis')
-      .attr('transform', `translate(0,${axisY})`);
-
-    const yAxisGroup = mainGroup.append('g')
-      .attr('class', 'y-axis');
-
-    // --- Data Groups ---
-    const dataGroup = mainGroup.append('g').attr('clip-path', 'url(#clip)');
-    
-    // Academic Line
-    const academicPath = dataGroup.append('path')
-      .attr('class', 'academic-line')
-      .attr('fill', 'none')
-      .attr('stroke', '#2563EB') // emci-accent
-      .attr('stroke-width', 2)
-      .style('opacity', 0.8);
-
-    // Attendance Bars
-    const attendanceGroup = dataGroup.append('g').attr('class', 'attendance-bars');
-
-    // Events
-    const eventsGroup = dataGroup.append('g').attr('class', 'events');
-
-    // Tooltip
-    const tooltip = d3.select(containerRef.current)
-      .append('div')
-      .attr('class', 'tooltip absolute hidden bg-white border border-slate-200 shadow-xl rounded-lg p-4 text-sm pointer-events-none z-50 max-w-sm transition-opacity duration-200')
-      .style('opacity', 0);
-
-    // --- Update Function ---
-    function updateTimeline(newXScale: d3.ScaleTime<number, number>) {
-      // Update X Axis
-      const xAxis = d3.axisBottom(newXScale)
-        .ticks(width > 800 ? d3.timeMonth.every(1) : d3.timeMonth.every(2))
-        .tickFormat((d: any) => format(d, 'MMM yyyy'))
-        .tickSizeOuter(0)
-        .tickSizeInner(6)
-        .tickPadding(12);
-
-      xAxisGroup.call(xAxis)
-        .call(g => g.select('.domain').attr('stroke', '#E2E8F0').attr('stroke-width', 1))
-        .call(g => g.selectAll('.tick line').attr('stroke', '#E2E8F0'))
-        .call(g => g.selectAll('.tick text').attr('fill', '#64748B').attr('font-size', '10px').attr('font-weight', '600').attr('letter-spacing', '0.05em').attr('text-transform', 'uppercase'));
-
-      // Update Y Grid
-      const yAxis = d3.axisLeft(yScaleAcademic)
-        .ticks(3)
-        .tickSize(-innerWidth)
-        .tickFormat(() => '');
-
-      yAxisGroup.call(yAxis)
-        .call(g => g.select('.domain').remove())
-        .call(g => g.selectAll('.tick line').attr('stroke', '#F1F5F9').attr('stroke-dasharray', '2,2'));
-
-      // Update Risk Background
-      const riskRects = riskGroup.selectAll('rect')
-        .data(timelineData.riskPeriods);
-
-      riskRects.enter()
-        .append('rect')
-        .merge(riskRects as any)
-        .attr('x', d => newXScale(parseDate(d.start)) || 0)
-        .attr('y', 0)
-        .attr('width', d => Math.max(0, (newXScale(parseDate(d.end)) || 0) - (newXScale(parseDate(d.start)) || 0)))
-        .attr('height', innerHeight)
-        .attr('fill', d => {
-          if (d.level === 'high') return 'url(#risk-gradient-high)';
-          if (d.level === 'medium') return 'url(#risk-gradient-medium)';
-          return 'transparent';
-        })
-        .style('opacity', 0.15);
-
-      riskRects.exit().remove();
-
-      // Update Academic Line
-      const lineGenerator = d3.line<any>()
-        .x(d => newXScale(parseDate(d.date)))
-        .y(d => yScaleAcademic(d.score))
-        .curve(d3.curveMonotoneX);
-
-      academicPath.attr('d', lineGenerator(timelineData.academic));
-
-      // Update Attendance Bars
-      const bars = attendanceGroup.selectAll('rect')
-        .data(timelineData.attendance);
-
-      bars.enter()
-        .append('rect')
-        .merge(bars as any)
-        .attr('x', d => (newXScale(parseDate(d.date)) || 0) - 3)
-        .attr('y', axisY)
-        .attr('width', 6)
-        .attr('height', d => yScaleAttendance(d.rate) - axisY)
-        .attr('fill', d => d.rate < 80 ? '#EF4444' : d.rate < 90 ? '#F59E0B' : '#E2E8F0')
-        .attr('rx', 3)
-        .style('opacity', 0.8);
-
-      bars.exit().remove();
-
-      // Update Events
-      const eventNodes = eventsGroup.selectAll('g.event-node')
-        .data(timelineData.events, (d: any) => d.id);
-
-      const eventNodesEnter = eventNodes.enter()
-        .append('g')
-        .attr('class', 'event-node cursor-pointer')
-        .on('mouseenter', (event, d) => {
-          tooltip.style('opacity', 1);
-          tooltip.html(`
-            <div class="flex flex-col gap-1.5">
-              <div class="flex items-center gap-2">
-                <span class="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">${format(parseDate(d.date), 'MMM d, yyyy')}</span>
-                <span class="px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider font-bold ${
-                  d.type === 'warning' ? 'bg-amber-100 text-amber-700' :
-                  d.type === 'intervention' ? 'bg-red-100 text-red-700' :
-                  d.type === 'milestone' ? 'bg-blue-100 text-blue-700' :
-                  'bg-slate-100 text-slate-700'
-                }">${d.type}</span>
-              </div>
-              <span class="font-medium text-slate-900 text-base">${d.title}</span>
-              <p class="text-xs text-slate-500 mt-1">${d.notes}</p>
-            </div>
-          `)
-          .classed('hidden', false);
-          
-          // Position tooltip
-          const tooltipNode = tooltip.node();
-          const tooltipWidth = tooltipNode ? tooltipNode.getBoundingClientRect().width : 0;
-          const tooltipHeight = tooltipNode ? tooltipNode.getBoundingClientRect().height : 0;
-          
-          let left = event.pageX + 15;
-          let top = event.pageY - tooltipHeight / 2;
-          
-          // Adjust if off-screen
-          if (left + tooltipWidth > window.innerWidth) {
-            left = event.pageX - tooltipWidth - 15;
-          }
-          
-          tooltip.style('left', `${left}px`).style('top', `${top}px`);
-          
-          d3.select(event.currentTarget).select('.node-shape')
-            .transition().duration(200)
-            .attr('transform', 'scale(1.5)');
-        })
-        .on('mousemove', (event) => {
-          const tooltipNode = tooltip.node();
-          const tooltipWidth = tooltipNode ? tooltipNode.getBoundingClientRect().width : 0;
-          const tooltipHeight = tooltipNode ? tooltipNode.getBoundingClientRect().height : 0;
-          
-          let left = event.pageX + 15;
-          let top = event.pageY - tooltipHeight / 2;
-          
-          if (left + tooltipWidth > window.innerWidth) {
-            left = event.pageX - tooltipWidth - 15;
-          }
-          
-          tooltip.style('left', `${left}px`).style('top', `${top}px`);
-        })
-        .on('mouseleave', (event) => {
-          tooltip.style('opacity', 0).classed('hidden', true);
-          d3.select(event.currentTarget).select('.node-shape')
-            .transition().duration(200)
-            .attr('transform', 'scale(1)');
-        })
-        .on('click', (event, d) => {
-          onSelectEvent(d);
-          // Highlight selected
-          eventsGroup.selectAll('.node-shape').attr('stroke-width', 1).attr('stroke', '#CBD5E1');
-          d3.select(event.currentTarget).select('.node-shape').attr('stroke-width', 2).attr('stroke', '#0F172A');
-        });
-
-      // Draw shapes based on type
-      eventNodesEnter.each(function(d) {
-        const g = d3.select(this);
-        const yPos = d.track === 'above' ? -40 : 40;
-        
-        // Vertical connecting line
-        g.append('line')
-          .attr('x1', 0)
-          .attr('y1', 0)
-          .attr('x2', 0)
-          .attr('y2', -yPos)
-          .attr('stroke', '#CBD5E1')
-          .attr('stroke-width', 1)
-          .attr('stroke-dasharray', '2,2');
-
-        if (d.type === 'milestone') {
-          // Diamond
-          g.append('polygon')
-            .attr('class', 'node-shape drop-shadow-sm')
-            .attr('points', '0,-6 6,0 0,6 -6,0')
-            .attr('fill', '#2563EB')
-            .attr('stroke', '#ffffff')
-            .attr('stroke-width', 1.5);
-        } else if (d.type === 'warning') {
-          // Triangle
-          g.append('polygon')
-            .attr('class', 'node-shape drop-shadow-sm')
-            .attr('points', '0,-7 7,5 -7,5')
-            .attr('fill', '#F59E0B')
-            .attr('stroke', '#ffffff')
-            .attr('stroke-width', 1.5);
-        } else if (d.type === 'intervention') {
-          // Square
-          g.append('rect')
-            .attr('class', 'node-shape drop-shadow-sm')
-            .attr('x', -5)
-            .attr('y', -5)
-            .attr('width', 10)
-            .attr('height', 10)
-            .attr('fill', '#EF4444')
-            .attr('stroke', '#ffffff')
-            .attr('stroke-width', 1.5);
-        } else {
-          // Circle (neutral)
-          g.append('circle')
-            .attr('class', 'node-shape drop-shadow-sm')
-            .attr('r', 5)
-            .attr('fill', '#F8FAFC')
-            .attr('stroke', '#64748B')
-            .attr('stroke-width', 2);
-        }
-      });
-
-      const allEventNodes = eventNodesEnter.merge(eventNodes as any);
-      
-      allEventNodes.attr('transform', d => {
-        const x = newXScale(parseDate(d.date)) || 0;
-        const y = d.track === 'above' ? axisY - 40 : axisY + 40;
-        return `translate(${x},${y})`;
-      });
-
-      eventNodes.exit().remove();
-    }
-
-    // Define gradients
-    const defs = svg.select('defs');
-    
-    const highRiskGrad = defs.append('linearGradient')
-      .attr('id', 'risk-gradient-high')
-      .attr('x1', '0%').attr('y1', '0%')
-      .attr('x2', '0%').attr('y2', '100%');
-    highRiskGrad.append('stop').attr('offset', '0%').attr('stop-color', '#EF4444').attr('stop-opacity', 0.8);
-    highRiskGrad.append('stop').attr('offset', '100%').attr('stop-color', '#EF4444').attr('stop-opacity', 0);
-
-    const mediumRiskGrad = defs.append('linearGradient')
-      .attr('id', 'risk-gradient-medium')
-      .attr('x1', '0%').attr('y1', '0%')
-      .attr('x2', '0%').attr('y2', '100%');
-    mediumRiskGrad.append('stop').attr('offset', '0%').attr('stop-color', '#F59E0B').attr('stop-opacity', 0.8);
-    mediumRiskGrad.append('stop').attr('offset', '100%').attr('stop-color', '#F59E0B').attr('stop-opacity', 0);
-
-    // Initial render
-    updateTimeline(xScale);
-
-    // Time scrubber line
-    const scrubber = mainGroup.append('line')
-      .attr('class', 'scrubber')
-      .attr('y1', 0)
-      .attr('y2', innerHeight)
-      .attr('stroke', '#0F172A')
-      .attr('stroke-width', 1)
-      .attr('stroke-dasharray', '4,4')
-      .style('opacity', 0)
-      .style('pointer-events', 'none');
-
-    // Scrubber date label
-    const scrubberLabel = mainGroup.append('text')
-      .attr('class', 'scrubber-label')
-      .attr('y', -10)
-      .attr('text-anchor', 'middle')
-      .attr('fill', '#0F172A')
-      .attr('font-size', '10px')
-      .attr('font-weight', '600')
-      .attr('font-family', 'Inter')
-      .style('opacity', 0)
-      .style('pointer-events', 'none');
-
-    // Overlay for mouse tracking
-    svg.append('rect')
-      .attr('class', 'overlay')
-      .attr('width', width)
-      .attr('height', height)
-      .style('fill', 'none')
-      .style('pointer-events', 'all')
-      .on('mousemove', (event) => {
-        const [x] = d3.pointer(event, mainGroup.node());
-        if (x >= 0 && x <= innerWidth) {
-          scrubber.attr('x1', x).attr('x2', x).style('opacity', 0.4);
-          
-          // Calculate date from current scale
-          const currentTransform = d3.zoomTransform(svg.node()!);
-          const currentXScale = currentTransform.rescaleX(xScale);
-          const date = currentXScale.invert(x);
-          
-          scrubberLabel
-            .attr('x', x)
-            .text(format(date, 'MMM d, yyyy'))
-            .style('opacity', 1);
-        } else {
-          scrubber.style('opacity', 0);
-          scrubberLabel.style('opacity', 0);
-        }
-      })
-      .on('mouseleave', () => {
-        scrubber.style('opacity', 0);
-        scrubberLabel.style('opacity', 0);
-      });
-
-  }, [dimensions, onSelectEvent]);
+  const firstByType = {
+    referral: events.find(e => e.type === 'referral'),
+    consent:  events.find(e => e.type === 'consent'),
+    session:  events.find(e => e.type === 'session'),
+    survey:   events.find(e => e.type === 'survey'),
+  };
 
   return (
-    <div className="flex-1 flex flex-col relative bg-white">
-      <div className="absolute top-6 left-6 z-10 pointer-events-none">
-        <h2 className="text-2xl font-medium tracking-tight text-slate-900">Student Journey</h2>
-        <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-medium">Scroll to zoom &bull; Drag to pan</p>
+    <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
+
+      {/* ── Stage Tracker ───────────────────────────────────────── */}
+      <div className="shrink-0 px-8 pt-8 pb-4 bg-white border-b border-slate-100">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 w-full text-center">Student Journey</h2>
+        </div>
+
+        {/* Circular stage nodes with connector lines */}
+        <div className="flex items-start w-full mb-2">
+          {STAGES.map((stage, i) => {
+            const isStage1 = stage.id === 'step-1';
+            const isMissingReferral = stage.id === 'step-1' && student?.currentStage === null;
+            const hasOtherActivities = events.length > 0;
+
+            const completed = isStage1
+              ? stage1Complete
+              : i <= currentStageIndex;
+            const active = isStage1
+              ? currentStageIndex === 0 && !stage1Complete
+              : i === currentStageIndex;
+
+            const isLast = i === STAGES.length - 1;
+            const Icon   = stage.icon;
+
+            return (
+              <React.Fragment key={stage.id}>
+                <button
+                  onClick={() => setActiveStage(activeStage === stage.id ? null : stage.id)}
+                  className="relative flex flex-col items-center group cursor-pointer flex-1"
+                >
+                  {/* Connector line (extends right from center of this node) */}
+                  {!isLast && (
+                    <div
+                      className={`absolute top-5 left-1/2 w-full h-[2px] transition-colors duration-300
+                        ${(completed || (isStage1 && active)) ? 'bg-primary' : 'bg-slate-200'}`}
+                    />
+                  )}
+
+                  {/* Circle node */}
+                  <div
+                    className={`size-10 rounded-full flex items-center justify-center z-10 border-4 border-white transition-all duration-200
+                      ${isMissingReferral && hasOtherActivities
+                        ? 'bg-orange-500 text-white ring-2 ring-orange-200'
+                        : isMissingReferral
+                          ? 'bg-amber-400 text-white ring-2 ring-amber-200'
+                          : completed
+                            ? 'bg-primary text-white ring-2 ring-primary/20'
+                            : active
+                              ? 'bg-primary text-white ring-2 ring-primary/20'
+                              : 'bg-white text-slate-300 border-slate-200 ring-2 ring-slate-100'
+                      }
+                    `}
+                  >
+                    {isMissingReferral
+                      ? <AlertTriangle className="w-5 h-5" />
+                      : completed
+                        ? <Check className="w-5 h-5" />
+                        : <Icon className="w-5 h-5" />
+                    }
+                  </div>
+
+                  {/* Label */}
+                  <p
+                    className={`mt-3 text-[11px] font-bold uppercase tracking-tight text-center leading-tight
+                      ${isMissingReferral
+                        ? (hasOtherActivities ? 'text-orange-600' : 'text-amber-600')
+                        : active
+                          ? 'text-primary'
+                          : completed
+                            ? 'text-slate-900'
+                            : 'text-slate-400'
+                      }`}
+                  >
+                    {stage.label}
+                  </p>
+                </button>
+              </React.Fragment>
+            );
+          })}
+        </div>
+
+        {/* Stage 1 missing referral — urgent banner */}
+        {student?.currentStage === null && events.length > 0 && (
+          <div className="mt-3 w-2/3 mx-auto flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2.5">
+            <AlertTriangle className="w-3.5 h-3.5 text-orange-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-orange-700 leading-relaxed">
+              <strong>Stage 1 not completed.</strong> This student has{' '}
+              {events.length} activit{events.length === 1 ? 'y' : 'ies'} recorded but
+              no referral or consent has been logged — this is a programme requirement.
+            </p>
+          </div>
+        )}
+
+        {/* Stage detail expansion */}
+        <AnimatePresence>
+          {activeStage && (() => {
+            const stage = STAGES.find(s => s.id === activeStage)!;
+
+            if (activeStage === 'step-1') {
+              const refEvent     = firstByType.referral;
+              const consentEvent = firstByType.consent;
+              if (!refEvent && !consentEvent) return null;
+              return (
+                <motion.div
+                  key="stage-detail-1"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="mt-3 w-2/3 mx-auto rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex flex-col gap-3 overflow-hidden"
+                >
+                  {refEvent && (
+                    <div className="flex items-start gap-3">
+                      <stage.icon className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-primary">{refEvent.title}</span>
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">Referral</span>
+                        </div>
+                        <span className="text-xs font-mono text-slate-400">{format(parseISO(refEvent.date), 'dd MMM yyyy')}</span>
+                        {refEvent.notes && <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">{refEvent.notes}</p>}
+                      </div>
+                    </div>
+                  )}
+                  {consentEvent && (
+                    <div className={`flex items-start gap-3 ${refEvent ? 'pt-3 border-t border-primary/10' : ''}`}>
+                      <stage.icon className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" />
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-emerald-700">{consentEvent.title}</span>
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">Consent</span>
+                        </div>
+                        <span className="text-xs font-mono text-slate-400">{format(parseISO(consentEvent.date), 'dd MMM yyyy')}</span>
+                        {consentEvent.notes && <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">{consentEvent.notes}</p>}
+                      </div>
+                    </div>
+                  )}
+                  {refEvent && !consentEvent && (
+                    <div className="flex items-center gap-2 pt-2 border-t border-primary/10">
+                      <Circle className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                      <span className="text-xs text-slate-400 italic">Consent not yet recorded</span>
+                    </div>
+                  )}
+                </motion.div>
+              );
+            }
+
+            const stageEventTypeMap: Record<string, keyof typeof firstByType> = {
+              'step-3': 'session',
+              'step-4': 'survey',
+            };
+            const event = firstByType[stageEventTypeMap[activeStage]];
+            if (!event) return null;
+            return (
+              <motion.div
+                key="stage-detail-other"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="mt-3 w-2/3 mx-auto rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex items-start gap-3 overflow-hidden"
+              >
+                <stage.icon className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <span className="text-sm font-bold text-primary">{event.title}</span>
+                  <span className="text-xs font-mono text-slate-400">{format(parseISO(event.date), 'dd MMM yyyy')}</span>
+                  <p className="text-sm text-slate-600 mt-1 leading-relaxed">{event.notes}</p>
+                </div>
+              </motion.div>
+            );
+          })()}
+        </AnimatePresence>
       </div>
-      
-      {/* Legend */}
-      <div className="absolute top-6 right-6 z-10 flex items-center gap-5 bg-white/90 backdrop-blur-md px-4 py-2.5 rounded-lg border border-slate-200/80 shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 bg-blue-600 rotate-45" />
-          <span className="text-[10px] uppercase tracking-widest text-slate-600 font-semibold">Milestone</span>
+
+      {/* ── Timeline Feed ────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-8 py-6">
+        {/* Section header */}
+        <div className="flex items-center justify-between sticky top-0 bg-slate-50/95 backdrop-blur py-2 z-10 mb-4">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">
+            Student Journey Timeline
+          </h3>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[8px] border-b-amber-500" />
-          <span className="text-[10px] uppercase tracking-widest text-slate-600 font-semibold">Warning</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 bg-red-500" />
-          <span className="text-[10px] uppercase tracking-widest text-slate-600 font-semibold">Intervention</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full border-[2px] border-slate-400 bg-slate-50" />
-          <span className="text-[10px] uppercase tracking-widest text-slate-600 font-semibold">Neutral</span>
+
+        {/* Timeline items */}
+        <div className="ml-4">
+          {[...events].reverse().map((event, idx) => {
+            const isFirst = idx === 0;
+            const isLast  = idx === events.length - 1;
+            const iconBg  = typeIconBg;
+
+            return (
+              <motion.div
+                key={event.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.15, delay: idx * 0.04 }}
+                className={`relative pl-8 group ${isLast ? 'pb-2' : 'pb-6'} border-l-2 border-slate-200`}
+              >
+                {/* Timeline dot */}
+                <div
+                  className={`absolute -left-[11px] top-0 size-5 rounded-full bg-white border-2 transition-transform group-hover:scale-110
+                    ${isFirst ? 'border-primary' : 'border-slate-200'}`}
+                />
+
+                {/* Card */}
+                <div
+                  onClick={() => setModalEvent(event)}
+                  className={`bg-white p-4 rounded-xl border shadow-sm cursor-pointer transition-all duration-150
+                    ${isFirst
+                      ? 'border-slate-200 hover:border-primary/50 hover:shadow-md'
+                      : 'border-slate-200 hover:border-primary/40 hover:shadow-md opacity-85 hover:opacity-100'
+                    }`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${iconBg}`}>
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-slate-900 group-hover:text-primary transition-colors truncate">
+                          {event.title}
+                        </h4>
+                        {event.by && (
+                          <p className="text-xs text-slate-500 truncate">
+                            {event.by}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-medium text-slate-400 shrink-0 ml-2 whitespace-nowrap">
+                      {format(parseISO(event.date), 'MMM d, h:mm a')}
+                    </span>
+                  </div>
+
+                  {event.description && (
+                    <p className="text-xs text-slate-500 line-clamp-2 mt-1">{event.description}</p>
+                  )}
+
+                  {/* Tags */}
+                  {(event.type || event.status) && (
+                    <div className="mt-3 flex gap-2 flex-wrap">
+                      {event.type && (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border capitalize
+                          ${typeBadgeColor[event.type] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                          {event.type}
+                        </span>
+                      )}
+                      {event.status && (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 border border-green-200 rounded text-[10px] font-bold">
+                          {event.status}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+
+          {events.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="size-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                <FileText className="w-5 h-5 text-slate-400" />
+              </div>
+              <p className="text-sm font-medium text-slate-500">No activities recorded</p>
+              <p className="text-xs text-slate-400 mt-1">Events will appear here as the student progresses</p>
+            </div>
+          )}
         </div>
       </div>
 
-      <div ref={containerRef} className="flex-1 w-full h-full cursor-grab active:cursor-grabbing" />
+      {/* ── Event Modal ──────────────────────────────────────────── */}
+      <AnimatePresence>
+        {modalEvent && (
+          <>
+            <motion.div
+              key="backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-40"
+              onClick={() => setModalEvent(null)}
+            />
+
+            <motion.div
+              key="modal"
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 40 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="fixed top-0 right-0 h-full w-[420px] bg-white shadow-2xl z-50 flex flex-col"
+            >
+              {/* Modal header */}
+              <div className="flex items-start justify-between px-6 py-5 border-b border-slate-100">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-primary/10`}>
+                    <FileText className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-bold text-slate-900 leading-tight">{modalEvent.title}</h3>
+                    <p className="text-xs text-slate-400 font-mono mt-0.5">{format(parseISO(modalEvent.date), 'dd MMM yyyy')}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setModalEvent(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal body */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
+                {/* Status & type badges */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {modalEvent.status && (
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                      {modalEvent.status}
+                    </span>
+                  )}
+                  {modalEvent.type && (
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border capitalize ${typeBadgeColor[modalEvent.type] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                      {modalEvent.type}
+                    </span>
+                  )}
+                </div>
+
+                {/* By */}
+                {modalEvent.by && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Recorded By</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center">
+                        <User className="w-3.5 h-3.5 text-slate-500" />
+                      </div>
+                      <span className="text-sm font-semibold text-slate-800">{modalEvent.by}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Description */}
+                {modalEvent.description && (
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <AlignLeft className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Description</span>
+                    </div>
+                    <p className="text-sm text-slate-700 leading-relaxed">{modalEvent.description}</p>
+                  </div>
+                )}
+
+                {/* Survey / Session fields */}
+                {modalEvent.surveyFields && modalEvent.surveyFields.length > 0 ? (
+                  <div className="flex flex-col gap-3 bg-slate-50 rounded-xl p-4 border border-slate-100">
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
+                      {modalEvent.type === 'session' ? 'Session Details' : 'Survey Responses'}
+                    </span>
+                    {(modalEvent.surveyFields as SurveyField[]).map((field, i) => (
+                      <div key={i} className="flex flex-col gap-0.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{field.label}</span>
+                        <span className="text-sm text-slate-700 leading-relaxed">{field.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  /* No structured fields — show description or empty state */
+                  modalEvent.description && modalEvent.description !== 'No survey responses recorded yet.' ? (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Notes</span>
+                      <p className="text-sm text-slate-600 leading-relaxed">{modalEvent.description}</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 py-6 text-center bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
+                        <FileText className="w-5 h-5 text-slate-300" />
+                      </div>
+                      <p className="text-sm font-medium text-slate-400">No survey responses on record</p>
+                      <p className="text-xs text-slate-300">The student has not yet completed this survey in Dataverse</p>
+                    </div>
+                  )
+                )}
+
+                {/* Dates */}
+                <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>Created</span>
+                    <span className="font-mono">{format(parseISO(modalEvent.date), 'dd MMM yyyy')}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>Last Modified</span>
+                    <span className="font-mono">{format(parseISO(modalEvent.modifiedDate ?? modalEvent.date), 'dd MMM yyyy')}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal footer */}
+              <div className="px-6 py-4 border-t border-slate-100">
+                <button
+                  onClick={() => { onSelectEvent(modalEvent); setModalEvent(null); }}
+                  className="w-full py-2.5 text-sm font-semibold text-white bg-primary hover:bg-primary/90 rounded-xl transition-colors"
+                >
+                  Open in Context Panel
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

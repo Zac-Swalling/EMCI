@@ -1,57 +1,88 @@
 import React from 'react';
+import type { Student } from '../data/studentsData';
 
-export function ProfileSnapshot() {
+interface ProfileSnapshotProps {
+  student: Student | null;
+  schoolName?: string;
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  Active:   'Active Guidance',
+  Inactive: 'Inactive',
+  Pending:  'Pending',
+};
+
+export function ProfileSnapshot({ student, schoolName }: ProfileSnapshotProps) {
+  const firstName  = student?.firstName    ?? '—';
+  const lastName   = student?.lastName     ?? '—';
+  const preferred  = student?.preferredName ?? firstName;
+  const morrisbyId = student?.morrisbyId   ?? '—';
+  const counsellor = student?.counsellor   ?? '—';
+  const status     = student?.status       ?? 'Active';
+  const yearLevel  = student?.yearLevel    ?? 0;
+  const avatar     = student?.avatar;
+
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-white/60 to-slate-50/20 p-6 gap-8">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-4xl font-light tracking-tight text-slate-900">Aanya</h2>
-        <span className="text-sm font-medium text-slate-400 tracking-wide">Aanya Bhatt</span>
-      </div>
+    <div className="flex flex-col h-full bg-white">
 
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Preferred Name</span>
-            <span className="text-sm font-medium text-slate-700">Aanya</span>
+      {/* ── Profile section ─────────────────────────────── */}
+      <div className="p-6 flex flex-col gap-6">
+
+        {/* Avatar + name */}
+        <div className="flex flex-col items-center text-center gap-4">
+          <div
+            className={`size-24 rounded-2xl border-4 border-white shadow-sm overflow-hidden
+              ${avatar ? 'bg-cover bg-center' : 'bg-slate-100 flex items-center justify-center'}`}
+            style={avatar ? { backgroundImage: `url(${avatar})` } : undefined}
+          >
+            {!avatar && (
+              <span className="text-3xl font-bold text-slate-400 select-none">
+                {firstName[0]}{lastName[0]}
+              </span>
+            )}
           </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Email Address</span>
-            <span className="text-sm font-medium text-slate-700">aanya.bhatt@emci.edu.au</span>
+
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">{firstName} {lastName}</h1>
+            <p className="text-slate-500 text-sm">
+              {preferred && preferred !== firstName ? `Preferred: ${preferred} | ` : ''}
+              {yearLevel ? `Year ${yearLevel}` : '—'}
+            </p>
           </div>
         </div>
 
-        <div className="h-px w-full bg-slate-200/60 my-2" />
+        {/* Info card + nav */}
+        <div className="flex flex-col gap-3">
 
-        <div className="flex flex-col gap-1">
-          <h3 className="text-[10px] uppercase tracking-widest text-slate-900 font-bold mb-2">EMCI School</h3>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">School Name</span>
-              <span className="text-sm font-medium text-slate-700">Ashwood School</span>
-            </div>
-            
-            <div className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Morrisby ID</span>
-              <span className="text-sm font-mono text-slate-700 tracking-tight">ASSM</span>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Status</span>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-sm font-medium text-slate-700">Active</span>
+          {/* Info card */}
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-500 uppercase font-semibold tracking-wider">Morrisby ID</span>
+                <span className="font-mono text-slate-700">{morrisbyId}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-500 uppercase font-semibold tracking-wider">Email</span>
+                <span className="text-slate-700 text-right max-w-[150px] truncate leading-tight" title={student?.email ?? '—'}>
+                  {student?.email ?? '—'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-500 uppercase font-semibold tracking-wider">Counsellor</span>
+                <span className="text-slate-700 text-right max-w-[130px] truncate leading-tight" title={counsellor}>
+                  {counsellor}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-500 uppercase font-semibold tracking-wider">Status</span>
+                <span className="text-primary font-bold">{STATUS_LABEL[status] ?? status}</span>
               </div>
             </div>
           </div>
-        </div>
-        
-        <div className="mt-auto pt-4 border-t border-slate-200/60">
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Last Updated</span>
-            <span className="text-xs font-mono text-slate-500">2026-03-17 18:06 UTC</span>
-          </div>
+
         </div>
       </div>
+
     </div>
   );
 }

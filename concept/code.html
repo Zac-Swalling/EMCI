@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ec5b13",
+                        "background-light": "#f8f6f6",
+                        "background-dark": "#221610",
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        @media print {
+            .no-print { display: none; }
+            body { background-color: white !important; }
+            .print-shadow { shadow: none !important; }
+            .a4-page { 
+                margin: 0; 
+                box-shadow: none !important;
+                border: none !important;
+            }
+        }
+        .a4-page {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 20mm;
+            margin: 10px auto;
+            background: white;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
+<!-- Top Navigation Bar -->
+<div class="no-print w-full bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+<header class="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
+<div class="flex items-center gap-4">
+<div class="text-primary">
+<span class="material-symbols-outlined text-3xl">grid_view</span>
+</div>
+<h2 class="text-lg font-bold leading-tight tracking-tight">EMCI Platform</h2>
+</div>
+<div class="flex items-center gap-8">
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Dashboard</a>
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Students</a>
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Reports</a>
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Settings</a>
+</nav>
+<div class="flex gap-2">
+<button class="flex items-center justify-center rounded-xl h-10 w-10 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/10 hover:text-primary transition-all">
+<span class="material-symbols-outlined">print</span>
+</button>
+<button class="flex items-center justify-center rounded-xl h-10 w-10 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/10 hover:text-primary transition-all">
+<span class="material-symbols-outlined">download</span>
+</button>
+<button class="flex items-center justify-center rounded-xl h-10 w-10 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/10 hover:text-primary transition-all">
+<span class="material-symbols-outlined">share</span>
+</button>
+<div class="ml-2 bg-slate-200 dark:bg-slate-700 rounded-full h-10 w-10 overflow-hidden">
+<img alt="Profile" class="h-full w-full object-cover" data-alt="User profile avatar placeholder" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDXLKuymKbakqpB3APfF8szWx-gr2xtGSG1XbpiPufYPLnDXDj6aMDGy71_YOvJ3H-6H0ax_wrQv48aX6OiKk-Hd2BxVYZ47YFVpMCszqvsIWDGGz1IhtwJzYMyIIGFkX6S1UFAdI-w0KsI-HPFHvQtatnj3_gWHIVmgHltKmF5SJumQrw71c0f92kSzfOw1JZpzZhTaJVBvElawLudDS6VN8LlqyHoF9A5tkON5pGwdHoZUJpV1vaPuWvxOHJx20CpZ9TnMEdvpsDb"/>
+</div>
+</div>
+</div>
+</header>
+</div>
+<!-- Breadcrumbs and Header Action -->
+<div class="no-print max-w-[210mm] mx-auto pt-8 px-4 flex flex-col md:flex-row justify-between items-end gap-4">
+<div>
+<nav class="flex gap-2 text-sm mb-2 text-slate-500 dark:text-slate-400">
+<a class="hover:text-primary" href="#">Reports</a>
+<span>/</span>
+<a class="hover:text-primary" href="#">Student Records</a>
+<span>/</span>
+<span class="text-primary font-medium">PDF Export</span>
+</nav>
+<h1 class="text-3xl font-black tracking-tight">Student Progress Report</h1>
+<p class="text-slate-500 dark:text-slate-400">Comprehensive evaluation for parent/stakeholder review</p>
+</div>
+<button class="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20" onclick="window.print()">
+<span class="material-symbols-outlined">picture_as_pdf</span>
+            Export PDF
+        </button>
+</div>
+<!-- Main Report Preview Area -->
+<main class="py-10 px-4">
+<div class="a4-page shadow-2xl rounded-sm mx-auto text-slate-800 relative overflow-hidden">
+<!-- Report Header -->
+<div class="flex justify-between items-start border-b-2 border-primary/20 pb-8 mb-8">
+<div class="flex gap-6 items-center">
+<div class="h-24 w-24 rounded-xl overflow-hidden border-2 border-slate-100">
+<img alt="Alex Harrison" class="h-full w-full object-cover" data-alt="Professional portrait of student Alex Harrison" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2bakbWqf20c05-PS-CO0aMdUeE8iqEs09hXztJD-jhQniOrcVqsz_FLQFZTpcA0Kmn3D4qE5SMRmESCeArKW6Fq8Z73nogQMYnnkMuXIDfrlPFnKFdz7-K4226rO6KePcGJ4wzQG90uaFfRCLAb-I95NrCtzv9Zte5p5-xtuYaaX2ozrpT2LYFsY-D2XuScVIjmuId8flI8ojc-61zvtPkK5qJ5fl6_RJWoiHv0RdRiWi3ZsH49UEFojSV9IPWDLj-2pNKyhvosBp"/>
+</div>
+<div>
+<h2 class="text-3xl font-bold text-slate-900">Alex Harrison</h2>
+<p class="text-lg text-primary font-semibold">Grade 11 • Student ID: EMCI-8842</p>
+<p class="text-slate-500 text-sm">Reporting Period: Fall 2023 - Spring 2024</p>
+</div>
+</div>
+<div class="text-right">
+<div class="flex items-center justify-end gap-2 text-primary mb-1">
+<span class="material-symbols-outlined">grid_view</span>
+<span class="font-bold tracking-tighter">EMCI</span>
+</div>
+<p class="text-xs text-slate-400 uppercase tracking-widest font-bold">Official Progress Report</p>
+<p class="text-xs text-slate-400 mt-1">Generated: Oct 24, 2023</p>
+</div>
+</div>
+<!-- Stage Timeline Section -->
+<section class="mb-10">
+<h3 class="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4 border-l-4 border-primary pl-3">Stage Timeline</h3>
+<div class="grid grid-cols-4 gap-2 relative">
+<div class="absolute top-4 left-0 w-full h-0.5 bg-slate-100 z-0"></div>
+<!-- Timeline Item 1 -->
+<div class="relative z-10 text-center">
+<div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center mx-auto mb-2 shadow-sm">
+<span class="material-symbols-outlined text-sm">check</span>
+</div>
+<p class="text-[10px] font-bold uppercase text-slate-400">Discovery</p>
+<p class="text-xs font-semibold">Completed</p>
+</div>
+<!-- Timeline Item 2 -->
+<div class="relative z-10 text-center">
+<div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center mx-auto mb-2 shadow-sm">
+<span class="material-symbols-outlined text-sm">check</span>
+</div>
+<p class="text-[10px] font-bold uppercase text-slate-400">Exploration</p>
+<p class="text-xs font-semibold">Completed</p>
+</div>
+<!-- Timeline Item 3 -->
+<div class="relative z-10 text-center">
+<div class="w-8 h-8 rounded-full bg-white border-2 border-primary text-primary flex items-center justify-center mx-auto mb-2 shadow-sm">
+<span class="material-symbols-outlined text-sm">rocket_launch</span>
+</div>
+<p class="text-[10px] font-bold uppercase text-primary">Industry Focus</p>
+<p class="text-xs font-semibold text-primary">Active Stage</p>
+</div>
+<!-- Timeline Item 4 -->
+<div class="relative z-10 text-center">
+<div class="w-8 h-8 rounded-full bg-slate-50 border-2 border-slate-200 text-slate-300 flex items-center justify-center mx-auto mb-2">
+<span class="material-symbols-outlined text-sm">school</span>
+</div>
+<p class="text-[10px] font-bold uppercase text-slate-400">Transition</p>
+<p class="text-xs font-semibold text-slate-400">Upcoming</p>
+</div>
+</div>
+</section>
+<!-- Academic & Attendance Trends -->
+<section class="mb-10 grid grid-cols-2 gap-8">
+<div>
+<h3 class="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4 border-l-4 border-primary pl-3">Academic Trends</h3>
+<div class="h-40 bg-slate-50 rounded-lg p-4 flex flex-col justify-between border border-slate-100">
+<div class="flex items-end justify-between h-24 gap-1 px-2">
+<div class="w-full bg-primary/20 rounded-t-sm h-[60%]"></div>
+<div class="w-full bg-primary/20 rounded-t-sm h-[75%]"></div>
+<div class="w-full bg-primary/20 rounded-t-sm h-[65%]"></div>
+<div class="w-full bg-primary rounded-t-sm h-[85%]"></div>
+<div class="w-full bg-primary/20 rounded-t-sm h-[70%]"></div>
+<div class="w-full bg-primary rounded-t-sm h-[92%]"></div>
+</div>
+<div class="flex justify-between text-[10px] font-bold text-slate-400 uppercase pt-2 border-t border-slate-200">
+<span>Aug</span><span>Oct</span><span>Dec</span><span>Feb</span><span>Apr</span><span>Jun</span>
+</div>
+</div>
+<p class="mt-2 text-xs text-slate-500 italic">Current GPA: <span class="text-primary font-bold">3.8 / 4.0</span></p>
+</div>
+<div>
+<h3 class="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4 border-l-4 border-primary pl-3">Attendance</h3>
+<div class="h-40 bg-slate-50 rounded-lg p-6 flex items-center justify-center border border-slate-100">
+<div class="relative h-28 w-28">
+<svg class="h-full w-full" viewbox="0 0 36 36">
+<path class="text-slate-200" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3"></path>
+<path class="text-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="96, 100" stroke-linecap="round" stroke-width="3"></path>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-2xl font-bold leading-none">96%</span>
+<span class="text-[8px] font-bold uppercase text-slate-400">On Time</span>
+</div>
+</div>
+</div>
+<p class="mt-2 text-xs text-slate-500 italic">Absent Days: <span class="text-primary font-bold">2</span> • Tardy: <span class="text-primary font-bold">1</span></p>
+</div>
+</section>
+<!-- Work Readiness Checklist -->
+<section class="mb-10 bg-slate-50 rounded-xl p-6 border border-slate-100">
+<h3 class="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4 border-l-4 border-primary pl-3">Work Readiness Checklist</h3>
+<div class="grid grid-cols-3 gap-6">
+<div>
+<p class="text-[11px] font-bold text-slate-500 uppercase mb-3">Industry Exposure</p>
+<ul class="space-y-2">
+<li class="flex items-center gap-2 text-xs">
+<span class="material-symbols-outlined text-primary text-sm">check_circle</span>
+                                Job Shadowing (Tech)
+                            </li>
+<li class="flex items-center gap-2 text-xs">
+<span class="material-symbols-outlined text-primary text-sm">check_circle</span>
+                                Networking Workshop
+                            </li>
+<li class="flex items-center gap-2 text-xs text-slate-400">
+<span class="material-symbols-outlined text-slate-300 text-sm">circle</span>
+                                Summer Internship
+                            </li>
+</ul>
+</div>
+<div>
+<p class="text-[11px] font-bold text-slate-500 uppercase mb-3">Career Interests</p>
+<div class="flex flex-wrap gap-1">
+<span class="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-medium">Software Engineering</span>
+<span class="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-medium">UX Design</span>
+<span class="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-medium">Data Analysis</span>
+</div>
+</div>
+<div>
+<p class="text-[11px] font-bold text-slate-500 uppercase mb-3">Skills Indicators</p>
+<div class="space-y-3">
+<div>
+<div class="flex justify-between text-[10px] mb-1">
+<span>Leadership</span>
+<span class="font-bold">85%</span>
+</div>
+<div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[85%]"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[10px] mb-1">
+<span>Technical</span>
+<span class="font-bold">92%</span>
+</div>
+<div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[92%]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Activity Log -->
+<section class="mb-10">
+<h3 class="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4 border-l-4 border-primary pl-3">Recent Activity Log</h3>
+<div class="overflow-hidden border border-slate-100 rounded-lg">
+<table class="w-full text-left text-xs">
+<thead class="bg-slate-50 text-slate-500 uppercase font-bold text-[10px]">
+<tr>
+<th class="px-4 py-2 border-b border-slate-100">Date</th>
+<th class="px-4 py-2 border-b border-slate-100">Activity</th>
+<th class="px-4 py-2 border-b border-slate-100">Outcome</th>
+<th class="px-4 py-2 border-b border-slate-100">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<tr>
+<td class="px-4 py-3 text-slate-500">Oct 18, 2023</td>
+<td class="px-4 py-3 font-semibold">Python Advanced Workshop</td>
+<td class="px-4 py-3 italic">Certification Earned</td>
+<td class="px-4 py-3"><span class="px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold text-[9px]">COMPLETED</span></td>
+</tr>
+<tr>
+<td class="px-4 py-3 text-slate-500">Oct 12, 2023</td>
+<td class="px-4 py-3 font-semibold">Mid-term Career Coaching</td>
+<td class="px-4 py-3 italic">Set 3 New Milestones</td>
+<td class="px-4 py-3"><span class="px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold text-[9px]">COMPLETED</span></td>
+</tr>
+<tr>
+<td class="px-4 py-3 text-slate-500">Oct 05, 2023</td>
+<td class="px-4 py-3 font-semibold">Community Service Project</td>
+<td class="px-4 py-3 italic">15 Hours Logged</td>
+<td class="px-4 py-3"><span class="px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold text-[9px]">COMPLETED</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- Counsellor Insights -->
+<section class="mb-10">
+<h3 class="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4 border-l-4 border-primary pl-3">Counsellor Insights</h3>
+<div class="p-6 bg-primary/5 rounded-xl border border-primary/10 italic text-slate-700 leading-relaxed text-sm">
+                    "Alex has shown exceptional growth this semester, particularly in his technical aptitude and collaborative skills. His focus on Software Engineering is well-supported by his academic performance in advanced mathematics and computer science. We recommend continuing with the current industry mentorship program to further sharpen his professional networking skills. Alex is currently on track for honors graduation and highly competitive university placements."
+                </div>
+<div class="mt-6 flex justify-between items-end">
+<div class="border-t border-slate-300 pt-2 w-48">
+<p class="text-xs font-bold">Dr. Sarah Jenkins</p>
+<p class="text-[10px] text-slate-400">Head of Student Success</p>
+</div>
+<div class="text-[10px] text-slate-300">
+                        Official EMCI Academic Stamp
+                    </div>
+</div>
+</section>
+<!-- Footer Text -->
+<div class="absolute bottom-6 left-20 right-20 flex justify-between text-[8px] text-slate-300 uppercase tracking-widest font-bold">
+<span>EMCI Platform • 2023 Annual Report</span>
+<span>Page 1 of 1</span>
+<span>Confidential Information</span>
+</div>
+<!-- Side accent for professional look -->
+<div class="absolute top-0 right-0 w-1.5 h-full bg-primary/10"></div>
+</div>
+</main>
+<!-- Print instructions (No print) -->
+<div class="no-print max-w-[210mm] mx-auto pb-10 px-4">
+<div class="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-center gap-4 text-blue-700">
+<span class="material-symbols-outlined">info</span>
+<p class="text-sm">For best results, print this document with <strong>No Margins</strong> and <strong>Background Graphics</strong> enabled in your browser print settings.</p>
+</div>
+</div>
+</body></html>

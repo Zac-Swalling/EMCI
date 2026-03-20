@@ -1,12 +1,57 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig, loadEnv} from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
-export default defineConfig(({mode}) => {
+export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
+
+  const TENANT_ID     = env.VITE_TENANT_ID     ?? '';
+  const CLIENT_ID     = env.VITE_CLIENT_ID     ?? '';
+  const CLIENT_SECRET = env.VITE_CLIENT_SECRET ?? '';
+  const TOKEN_SCOPE   = env.VITE_TOKEN_SCOPE   ?? '';
+  const MS_TOKEN_URL  = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
+
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'dataverse-token-server',
+        configureServer(server) {
+          // POST /devtoken — Node fetches the token from Azure AD.
+          // Because this runs in Node (no browser Origin header) AADSTS9002326 cannot fire.
+          server.middlewares.use('/devtoken', async (req, res) => {
+            if (req.method !== 'POST') {
+              res.statusCode = 405;
+              res.end('Method Not Allowed');
+              return;
+            }
+            try {
+              const body = new URLSearchParams({
+                client_id:     CLIENT_ID,
+                client_secret: CLIENT_SECRET,
+                grant_type:    'client_credentials',
+                scope:         TOKEN_SCOPE,
+              });
+              const tokenRes = await fetch(MS_TOKEN_URL, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body:    body.toString(),
+              });
+              const data = await tokenRes.json() as Record<string, unknown>;
+              res.setHeader('Content-Type', 'application/json');
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.statusCode = tokenRes.status;
+              res.end(JSON.stringify(data));
+            } catch (e: any) {
+              res.statusCode = 500;
+              res.end(JSON.stringify({ error: e?.message ?? 'Internal error' }));
+            }
+          });
+        },
+      },
+    ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
@@ -16,9 +61,21 @@ export default defineConfig(({mode}) => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
+      proxy: {
+        '/dataverse': {
+          target: 'https://mcicrm.crm6.dynamics.com',
+          changeOrigin: true,
+          secure: true,
+          rewrite: (p) => p.replace(/^\/dataverse/, ''),
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq, req) => {
+              const auth = (req as any).headers?.authorization;
+              if (auth) proxyReq.setHeader('Authorization', auth);
+            });
+          },
+        },
+      },
     },
   };
 });
