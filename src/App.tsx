@@ -10,6 +10,7 @@ import { CounsellorView } from './components/CounsellorView';
 import { DataverseLab } from './components/DataverseLab';
 import { SurveySearch } from './components/SurveySearch';
 import { StudentSearch } from './components/StudentSearch';
+import { LoginPage } from './components/LoginPage';
 import type { Student } from './data/studentsData';
 import type { School } from './data/networkData';
 import {
@@ -32,6 +33,7 @@ import {
   type RawEndOfPilotSurvey2026,
   type RawMidPilotStudentSurvey,
 } from './services/dataverse';
+import { supabase, mapUser, type AppUser } from './services/supabase';
 import { ChevronLeft, FileDown, ChevronRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 
 // Navigation hierarchy:
@@ -44,6 +46,10 @@ type Page = 'network' | 'school' | 'student' | 'pdf' | 'counsellors' | 'devlab' 
 const TOKEN_URL = '/devtoken';
 
 export default function App() {
+  // ── SSO auth state ───────────────────────────────────────────
+  const [authUser, setAuthUser]     = useState<AppUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   // ── Auth + data state ────────────────────────────────────────
   const [token, setToken]               = useState('');
   const [tokenLoading, setTokenLoading] = useState(true);
@@ -182,6 +188,20 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Supabase SSO — check session + listen for changes ────────
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthUser(data.session?.user ? mapUser(data.session.user) : null);
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ? mapUser(session.user) : null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   // ── Helpers ───────────────────────────────────────────────────
   function handleSelectSchool(school: School) {
     setSelectedSchool(school);
@@ -205,6 +225,19 @@ export default function App() {
   const studentSchoolName = selectedStudent
     ? (schools.find(s => s.id === (selectedStudent as any).schoolId)?.name ?? selectedSchool?.name ?? undefined)
     : undefined;
+
+  // ── SSO gate — show login until authenticated ─────────────────
+  if (authLoading) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return <LoginPage />;
+  }
 
   // ── Loading screen ────────────────────────────────────────────
   if (tokenLoading || (dataLoading && students.length === 0)) {

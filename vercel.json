@@ -1,0 +1,10 @@
+{
+  "rewrites": [
+    { "source": "/devtoken", "destination": "/api/devtoken" },
+    { "source": "/dataverse/:path*", "destination": "/api/dataverse?path=:path*" }
+  ],
+  "functions": {
+    "api/devtoken.ts": { "maxDuration": 10 },
+    "api/dataverse.ts": { "maxDuration": 30 }
+  }
+}

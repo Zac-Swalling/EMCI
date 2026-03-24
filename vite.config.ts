@@ -6,10 +6,13 @@ import { defineConfig, loadEnv } from 'vite';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
 
-  const TENANT_ID     = env.VITE_TENANT_ID     ?? '';
-  const CLIENT_ID     = env.VITE_CLIENT_ID     ?? '';
-  const CLIENT_SECRET = env.VITE_CLIENT_SECRET ?? '';
-  const TOKEN_SCOPE   = env.VITE_TOKEN_SCOPE   ?? '';
+  // Read without VITE_ prefix — these are server-only secrets and must never
+  // be bundled into the client. Fall back to VITE_-prefixed names so existing
+  // .env files continue working during development.
+  const TENANT_ID     = env.TENANT_ID     ?? env.VITE_TENANT_ID     ?? '';
+  const CLIENT_ID     = env.CLIENT_ID     ?? env.VITE_CLIENT_ID     ?? '';
+  const CLIENT_SECRET = env.CLIENT_SECRET ?? env.VITE_CLIENT_SECRET ?? '';
+  const TOKEN_SCOPE   = env.TOKEN_SCOPE   ?? env.VITE_TOKEN_SCOPE   ?? '';
   const MS_TOKEN_URL  = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
 
   return {

@@ -5,7 +5,81 @@ Entries are ordered newest-first within each release.
 
 ---
 
-## [Unreleased] — 2026-03-20 (latest)
+## [Unreleased] — 2026-03-24 (latest)
+
+### Vercel Deployment Support
+
+Added full Vercel serverless deployment support, replacing Vite development-only server plugins with production-ready API routes.
+
+#### Added: `api/devtoken.ts`
+- Vercel serverless function that handles `POST /devtoken`, exchanging Azure AD client credentials for an access token.
+- Reads `TENANT_ID`, `CLIENT_ID`, `CLIENT_SECRET`, and `TOKEN_SCOPE` from server-side environment variables (no `VITE_` prefix — never exposed to the browser).
+- Returns Azure AD token response with CORS headers for consumption by the frontend Dataverse service.
+
+#### Added: `api/dataverse.ts`
+- Vercel serverless proxy function that handles `/dataverse/:path*` requests, forwarding them to `https://mcicrm.crm6.dynamics.com`.
+- Passes through the client-supplied `Authorization` header, `Prefer`, and OData headers.
+
+#### Added: `vercel.json`
+- Rewrites `/devtoken` → `/api/devtoken` and `/dataverse/:path*` → `/api/dataverse` so the frontend URL structure remains unchanged between dev and production.
+- Sets `maxDuration` for both functions (10s token, 30s proxy).
+
+#### Updated: `vite.config.ts`
+- Azure AD credentials now read from non-`VITE_`-prefixed env vars (`TENANT_ID`, `CLIENT_ID`, `CLIENT_SECRET`, `TOKEN_SCOPE`) with fallback to old `VITE_`-prefixed names for backwards compatibility.
+
+#### Updated: `.env` / `.env.example`
+- Azure AD secrets updated to use `TENANT_ID`, `CLIENT_ID`, `CLIENT_SECRET`, `TOKEN_SCOPE` (no `VITE_` prefix). Supabase public keys retain the `VITE_` prefix.
+- **Security fix:** `VITE_`-prefixed vars are baked into the browser bundle by Vite — removing the prefix from secrets ensures they remain server-side only.
+
+**Vercel environment variables to add in Dashboard → Settings → Environment Variables:**
+
+| Variable | Where used |
+|---|---|
+| `TENANT_ID` | `api/devtoken.ts` (server only) |
+| `CLIENT_ID` | `api/devtoken.ts` (server only) |
+| `CLIENT_SECRET` | `api/devtoken.ts` (server only) |
+| `TOKEN_SCOPE` | `api/devtoken.ts` (server only) |
+| `VITE_SUPABASE_URL` | Frontend (Supabase client) |
+| `VITE_SUPABASE_ANON_KEY` | Frontend (Supabase client) |
+
+---
+
+## [Unreleased] — 2026-03-20
+
+### Microsoft SSO via Supabase Auth
+
+Implemented Microsoft Azure AD Single Sign-On using Supabase Auth as the identity broker. Users must authenticate with their SecureLogic Microsoft account before accessing the platform.
+
+#### Added: `src/services/supabase.ts`
+- Initialises `@supabase/supabase-js` client from `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` env vars.
+- `signInWithMicrosoft()` — triggers `supabase.auth.signInWithOAuth({ provider: 'azure' })` with `openid profile email` scopes and `redirectTo: window.location.origin`.
+- `signOut()` — calls `supabase.auth.signOut()`.
+- `getSession()` — returns current Supabase session.
+- `mapUser(user)` — maps Supabase `User` to `AppUser` (`id`, `email`, `displayName`, `firstName`, `avatarUrl`) from Microsoft `user_metadata`.
+
+#### Added: `src/components/LoginPage.tsx`
+- Full-screen branded login page with EMCI logo, background ring decoration, and "Sign in with Microsoft" button (black, Microsoft four-square logo).
+- Shows inline error if OAuth fails to initiate.
+- Loading state persists while browser redirects to Microsoft.
+- Security note: "credentials are never stored by EMCI."
+
+#### Updated: `src/App.tsx`
+- Imports `supabase`, `mapUser`, `AppUser` from `src/services/supabase.ts`.
+- `authUser` + `authLoading` state managed via `supabase.auth.getSession()` on mount and `supabase.auth.onAuthStateChange` listener (subscription cleaned up on unmount).
+- **SSO gate:** renders a spinner while auth state is loading, then `<LoginPage />` if unauthenticated — all existing app pages are unreachable without a valid Supabase session.
+- `authUser` available to pass to Header for name/avatar display.
+
+#### Updated: `.env` / `.env.example`
+- Added `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+
+#### Setup required (one-time, manual):
+1. **Supabase Dashboard** → Authentication → Providers → Azure → Enable, enter:
+   - Client ID: *(see .env / Azure Portal)*
+   - Client Secret: *(see .env — never commit)*
+   - Azure Tenant URL: `https://login.microsoftonline.com/<tenant-id>`
+2. **Azure Portal** → App Registrations → Authentication → Add redirect URI:
+   - `https://<project>.supabase.co/auth/v1/callback`
+3. **Supabase Dashboard** → Authentication → URL Configuration → add `http://localhost:5173` to Allowed Redirect URLs (for local dev).
 
 ### New Feature: Student Search page (Dataverse Lab)
 
