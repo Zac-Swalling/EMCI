@@ -7,6 +7,30 @@ Entries are ordered newest-first within each release.
 
 ## [Unreleased] — 2026-03-20 (latest)
 
+### New Feature: Student Search page (Dataverse Lab)
+
+A new **Student Search** page accessible from Dataverse Lab via the "Student Search" button in the header.
+
+#### Added: `src/components/StudentSearch.tsx`
+- Full-screen page with free-text search + 9 categorical filter dropdowns.
+- **Free-text** searches across: first name, last name, preferred name, Morrisby ID, email, counsellor, school name, student type, year level label, stage label, and record ID simultaneously.
+- **Filter dropdowns** (each with inline search when > 6 options): Year Level, Status, Stage, Risk Level, Counsellor, School, Student Type, Interviewed (Yes/No), Has Profile (Yes/No).
+- Filters toggle panel (collapsible) with a live badge count of active filters.
+- "Reset" button in header clears all filters and query at once.
+- Results table with column headers: Name, Year, School, Stage, Risk, Status, Flags (interviewed/profile icons).
+- Click any row to **expand** a full field grid showing all 16 student fields (full name, preferred name, Morrisby ID, email, year label, school, counsellor, status, stage, progress, risk, student type, interviewed, has profile, last activity, record ID).
+- Footer shows result count and icon legend.
+
+#### Updated: `src/App.tsx`
+- Added `'studentsearch'` to the `Page` union type.
+- Renders `<StudentSearch students schools onBack>` for the new page.
+- `DataverseLab` now receives `onGoToStudentSearch` prop.
+
+#### Updated: `src/components/DataverseLab.tsx`
+- Added optional `onGoToStudentSearch?: () => void` prop.
+- Added `Users` lucide icon import.
+- Added "Student Search" button in the header action bar (alongside Survey Search).
+
 ### Network Overview — Remove "All Regions" button
 
 #### Updated: `src/components/NetworkOverview.tsx`

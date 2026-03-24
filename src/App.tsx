@@ -9,6 +9,7 @@ import { NetworkOverview } from './components/NetworkOverview';
 import { CounsellorView } from './components/CounsellorView';
 import { DataverseLab } from './components/DataverseLab';
 import { SurveySearch } from './components/SurveySearch';
+import { StudentSearch } from './components/StudentSearch';
 import type { Student } from './data/studentsData';
 import type { School } from './data/networkData';
 import {
@@ -37,7 +38,8 @@ import { ChevronLeft, FileDown, ChevronRight, Loader2, AlertCircle, RefreshCw } 
 // network → school → student → pdf
 //         → counsellors
 //         → devlab → surveysearch
-type Page = 'network' | 'school' | 'student' | 'pdf' | 'counsellors' | 'devlab' | 'surveysearch';
+//                  → studentsearch
+type Page = 'network' | 'school' | 'student' | 'pdf' | 'counsellors' | 'devlab' | 'surveysearch' | 'studentsearch';
 
 const TOKEN_URL = '/devtoken';
 
@@ -260,7 +262,7 @@ export default function App() {
 
   // ── Dataverse Lab ────────────────────────────────────────────
   if (page === 'devlab') {
-    return <DataverseLab onBack={() => goTo('network')} onGoToSurveySearch={() => goTo('surveysearch')} />;
+    return <DataverseLab onBack={() => goTo('network')} onGoToSurveySearch={() => goTo('surveysearch')} onGoToStudentSearch={() => goTo('studentsearch')} />;
   }
 
   // ── Survey Search ─────────────────────────────────────────────
@@ -269,6 +271,17 @@ export default function App() {
       <SurveySearch
         students={students}
         studentEventsMap={studentEventsMap}
+        onBack={() => goTo('devlab')}
+      />
+    );
+  }
+
+  // ── Student Search ────────────────────────────────────────────
+  if (page === 'studentsearch') {
+    return (
+      <StudentSearch
+        students={students}
+        schools={schools}
         onBack={() => goTo('devlab')}
       />
     );

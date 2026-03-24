@@ -6,7 +6,7 @@ import {
   Loader2, Key, Globe, Table2, Search, History, X,
   Download, Eye, EyeOff, RefreshCw, Hash, ToggleLeft, Zap,
   Database, ChevronRight, ArrowRight, Columns, Tag, SquareFunction,
-  ChevronDown, Info, ClipboardList
+  ChevronDown, Info, ClipboardList, Users
 } from 'lucide-react';
 
 interface RequestHistoryItem {
@@ -47,6 +47,7 @@ interface ExplorerAttribute {
 interface DataversLabProps {
   onBack: () => void;
   onGoToSurveySearch?: () => void;
+  onGoToStudentSearch?: () => void;
 }
 
 const DEFAULT_BASE_URL = '/dataverse/api/data/v9.2';
@@ -128,7 +129,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-export function DataverseLab({ onBack, onGoToSurveySearch }: DataversLabProps) {
+export function DataverseLab({ onBack, onGoToSurveySearch, onGoToStudentSearch }: DataversLabProps) {
   // Connection config
   const [baseUrl, setBaseUrl]         = useState(DEFAULT_BASE_URL);
   const [bearerToken, setBearerToken] = useState(DEFAULT_TOKEN);
@@ -443,6 +444,15 @@ export function DataverseLab({ onBack, onGoToSurveySearch }: DataversLabProps) {
           <span className="text-[10px] px-1.5 py-0.5 bg-violet-100 text-violet-700 border border-violet-300 rounded font-semibold uppercase tracking-widest">DEV</span>
         </div>
         <div className="flex items-center gap-2">
+          {onGoToStudentSearch && (
+            <button
+              onClick={onGoToStudentSearch}
+              className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 px-3 py-1.5 rounded-lg bg-violet-50 hover:bg-violet-100 border border-violet-200 transition-colors"
+            >
+              <Users className="w-3.5 h-3.5" />
+              Student Search
+            </button>
+          )}
           {onGoToSurveySearch && (
             <button
               onClick={onGoToSurveySearch}
